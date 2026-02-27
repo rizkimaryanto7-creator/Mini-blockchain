@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniBitcoin Dashboard | S24 Ultra Engine</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --primary: #6366f1; --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --neon: #00f2ff; }
+        [data-theme="light"] { --bg: #f8fafc; --card: #ffffff; --text: #0f172a; }
+        body { background: var(--bg); color: var(--text); transition: 0.3s; font-family: 'Inter', sans-serif; overflow-x: hidden; }
+        .card { background: var(--card); border: 1px solid #374151; color: inherit; border-radius: 16px; margin-bottom: 20px; transition: 0.3s; }
+        .card:hover { border-color: var(--primary); }
+        .nav-pills .nav-link { color: #94a3b8; border-radius: 10px; padding: 12px; margin: 0 5px; }
+        .nav-pills .nav-link.active { background: var(--primary); color: white; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4); }
+        .search-bar { background: var(--card); border: 1px solid #374151; color: white; border-radius: 10px; }
+        .hash-font { font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 0.75rem; }
+        .status-online { height: 10px; width: 10px; background: #22c55e; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #22c55e; }
+        [aria-busy="true"] { cursor: wait; opacity: 0.8; }
+    </style>
+</head>
+<body data-theme="dark">
+
+    <nav class="navbar navbar-expand-lg border-bottom border-secondary mb-4 p-3 shadow-sm" role="navigation">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#">₿ MINIBITCOIN <span class="badge bg-primary ms-1">S24 PRO</span></a>
+            <div class="d-flex align-items-center">
+                <button onclick="toggleTheme()" class="btn btn-sm btn-outline-light me-3" aria-label="Toggle Theme">🌓 Mode</button>
+                <div class="dropdown">
+                    <button class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown">Connect Wallet</button>
+                    <ul class="dropdown-menu dropdown-menu-dark">
+                        <li><a class="dropdown-item" href="#">Google Login</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-info" href="#">S24 Local Node</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="input-group shadow-sm">
+                    <input type="text" id="searchInput" class="form-control search-bar" placeholder="Cari Block Index / Hash / Alamat...">
+                    <button class="btn btn-primary px-4" onclick="searchBlockchain()">Search</button>
+                </div>
+            </div>
+        </div>
+
+        <ul class="nav nav-pills mb-4 justify-content-center p-2 bg-dark rounded-4 shadow" role="tablist">
+            <li class="nav-item"><a class="nav-link active" data-bs-toggle="pill" href="#tab-explorer" role="tab">Explorer</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#tab-mining" role="tab">Mining</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#tab-wallet" role="tab">Wallet</a></li>
+        </ul>
+
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="tab-explorer" role="tabpanel">
+                <div class="row g-3 mb-4 text-center">
+                    <div class="col-6 col-md-3"><div class="card p-3">Supply<h4 id="sup" class="fw-bold text-primary mb-0">0</h4><small class="text-muted">BTC</small></div></div>
+                    <div class="col-6 col-md-3"><div class="card p-3">Mempool<h4 id="pend" class="fw-bold text-info mb-0">0</h4><small class="text-muted">TX</small></div></div>
+                    <div class="col-6 col-md-3"><div class="card p-3">Height<h4 id="height" class="fw-bold text-warning mb-0">0</h4><small class="text-muted">Blocks</small></div></div>
+                    <div class="col-6 col-md-3"><div class="card p-3">Status<h4 class="fw-bold mb-0" style="color: #22c55e;">Online</h4><small class="text-muted">Node</small></div></div>
+                </div>
+                <div class="row">
+                    <div class="col-lg-8 mb-3">
+                        <div class="card p-4 h-100 shadow-sm">
+                            <h5 class="mb-3 fw-bold text-muted">Hash Performance (Nonce)</h5>
+                            <canvas id="mainChart" height="140"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 mb-3">
+                        <div class="card p-4 h-100 shadow-sm">
+                            <h5 class="mb-3 fw-bold text-muted">Recent Blocks</h5>
+                            <div id="block-list" class="mt-2" style="max-height: 300px; overflow-y: auto;" aria-live="polite"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-mining" role="tabpanel">
+                <div class="card p-5 text-center border-primary shadow-lg">
+                    <h2 class="fw-bold">Mining Dashboard</h2>
+                    <p class="text-muted">Node Engine: Termux on Android</p>
+                    <div class="row my-4 bg-dark py-4 rounded-4 border border-secondary">
+                        <div class="col-md-6 border-end border-secondary">
+                            <h2 id="diff_display" class="fw-bold text-warning">--</h2>
+                            <p class="mb-0 small text-muted text-uppercase fw-bold">Current Difficulty</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h2 id="last_nonce_display" class="fw-bold text-info">0</h2>
+                            <p class="mb-0 small text-muted text-uppercase fw-bold">Last Solved Nonce</p>
+                        </div>
+                    </div>
+                    <div class="alert alert-dark bg-black border-secondary mb-4 p-3 shadow-sm">
+                        <small class="text-muted d-block mb-1">Mining Address (Coinbase Reward):</small>
+                        <span class="hash-font text-primary fw-bold" id="miner_addr">13ozV8FntBHAe7rT7iFiuxuGTTohrRGPVa</span>
+                    </div>
+                    <button id="mineBtn" onclick="triggerMine()" class="btn btn-primary btn-lg w-100 py-3 fw-bold shadow">EXECUTE MINING</button>
+                    <div id="mineStatus" class="mt-4 small text-muted" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-wallet" role="tabpanel">
+                <div class="card p-4 max-width-600 mx-auto border-success">
+                    <h4 class="fw-bold">Your Wallet</h4>
+                    <div class="p-4 bg-dark rounded-4 my-3 border border-secondary text-center">
+                        <small class="text-muted text-uppercase fw-bold">Balance Available</small>
+                        <h1 class="fw-bold m-0 text-success"><span id="balance_btc">0.00</span> BTC</h1>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small text-muted mb-1 fw-bold">Receiver BTC Address</label>
+                        <input type="text" id="tx_receiver" class="form-control bg-dark text-white border-secondary p-3" placeholder="1BvBMseyWPtx....">
+                    </div>
+                    <button class="btn btn-primary w-100 py-3 fw-bold shadow">Send Transaction</button>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-5 p-5 text-center border-top border-secondary opacity-50">
+            <p class="small mb-0">Powered by Samsung Galaxy S24 Ultra & Termux</p>
+            <p style="font-size: 9px;" class="text-uppercase tracking-widest">Difficulty Adjustment v2.1 Active</p>
+        </footer>
+    </div>
+
+    <script>
+        let mainChart;
+        let isPollingActive = true;
+        const BTC_ADDR_REGEX = /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/;
+
+        function toggleTheme() {
+            const body = document.body;
+            body.dataset.theme = body.dataset.theme === "dark" ? "light" : "dark";
+        }
+
+        async function refreshData() {
+            if (!isPollingActive) return;
+            try {
+                const [statsRes, chainRes] = await Promise.all([
+                    fetch('/api/v1/stats'),
+                    fetch('/chain')
+                ]);
+                
+                const stats = await statsRes.json();
+                const chainData = await chainRes.json();
+                const chain = chainData.chain;
+
+                // Update UI Stats
+                document.getElementById('sup').innerText = stats.total_supply.toFixed(2);
+                document.getElementById('pend').innerText = stats.pending_tx;
+                document.getElementById('height').innerText = stats.total_blocks - 1;
+                document.getElementById('diff_display').innerText = stats.difficulty;
+
+                // Update Block List
+                const list = document.getElementById('block-list');
+                const recentBlocks = [...chain].reverse().slice(0, 5);
+                list.innerHTML = recentBlocks.map(b => `
+                    <div class="p-3 mb-2 bg-dark rounded-3 border-secondary border hover-effect shadow-sm">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="fw-bold text-primary">#${b.index}</span>
+                            <span class="badge bg-secondary" style="font-size: 10px;">N: ${b.nonce}</span>
+                        </div>
+                        <div class="text-muted hash-font mt-2 text-truncate" style="font-size: 10px;">${b.hash}</div>
+                    </div>
+                `).join('');
+
+                // Update Chart
+                const last10 = chain.slice(-10);
+                updateChart(last10.map(b => "#"+b.index), last10.map(b => b.nonce));
+
+                // Balance Update
+                const balRes = await fetch(`/balance?address=${document.getElementById('miner_addr').innerText}`);
+                const balData = await balRes.json();
+                document.getElementById('balance_btc').innerText = balData.balance_btc.toFixed(4);
+                
+                if (chain.length > 0) {
+                    document.getElementById('last_nonce_display').innerText = chain[chain.length - 1].nonce;
+                }
+            } catch (e) { console.error("Refresh Error:", e); }
+        }
+
+        async function triggerMine() {
+            const btn = document.getElementById('mineBtn');
+            const status = document.getElementById('mineStatus');
+            const addr = document.getElementById('miner_addr').innerText;
+
+            if (!BTC_ADDR_REGEX.test(addr)) {
+                status.innerHTML = `<span class="text-danger">Error: Alamat Miner Tidak Valid!</span>`;
+                return;
+            }
+
+            btn.disabled = true;
+            btn.setAttribute('aria-busy', 'true');
+            btn.innerText = "MINING IN PROGRESS...";
+            status.innerHTML = `<div class="spinner-border spinner-border-sm text-primary me-2"></div> Mencari valid hash...`;
+
+            try {
+                const res = await fetch(`/mine?address=${addr}`);
+                const result = await res.json();
+                if(result.status === "success") {
+                    status.innerHTML = `<span class="text-success fw-bold">🎉 SUCCESS! Block #${result.block_index} found!</span>`;
+                    refreshData();
+                } else {
+                    status.innerHTML = `<span class="text-danger">Gagal: ${result.message}</span>`;
+                }
+            } catch (e) {
+                status.innerText = "Error: Node Timeout";
+            } finally {
+                btn.disabled = false;
+                btn.setAttribute('aria-busy', 'false');
+                btn.innerText = "EXECUTE MINING";
+            }
+        }
+
+        function updateChart(labels, data) {
+            if (mainChart) {
+                mainChart.data.labels = labels;
+                mainChart.data.datasets[0].data = data;
+                mainChart.update('none'); // Update tanpa animasi biar ringan
+            } else {
+                const ctx = document.getElementById('mainChart').getContext('2d');
+                mainChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Nonce',
+                            data: data,
+                            borderColor: '#6366f1',
+                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } }
+                    }
+                });
+            }
+        }
+
+        // Battery & Performance Optimization: Pause polling if tab hidden
+        document.addEventListener("visibilitychange", () => {
+            isPollingActive = !document.hidden;
+        });
+
+        setInterval(refreshData, 5000);
+        refreshData();
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
